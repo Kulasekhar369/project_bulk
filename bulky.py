@@ -1,28 +1,29 @@
-from github import Github
 import os
+import requests
 
-# --- STEP 1: Read GitHub Token from environment ---
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+# Step 1: Get GitHub token from environment
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+
 if not GITHUB_TOKEN:
-    raise Exception("❌ Environment variable GITHUB_TOKEN not set!")
+    raise Exception("❌ Environment variable GITHUB_TOKEN is not set")
 
-# --- STEP 2: Initialize PyGithub ---
-try:
-    g = Github(GITHUB_TOKEN)
-    user = g.get_user()
-    print(f"✅ Authenticated as: {user.login}")
-except Exception as e:
-    print(f"❌ Authentication failed: {e}")
-    exit(1)
+# Step 2: Set headers for the API request
+headers = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github+json"
+}
 
-# --- STEP 3: Try accessing a specific repository ---
-REPO_NAME = "your-org/your-repo"  # Replace with your repo, e.g., "octocat/Hello-World"
+# Step 3: Make a request to the authenticated user endpoint
+response = requests.get("https://api.github.com/user", headers=headers)
 
-try:
-    repo = g.get_repo(REPO_NAME)
-    print(f"✅ Repository accessed: {repo.full_name}")
-    print(f"📦 Default Branch: {repo.default_branch}")
-    print(f"⭐ Stars: {repo.stargazers_count}")
-    print(f"🔧 Permissions: {repo.permissions}")
-except Exception as e:
-    print(f"❌ Failed to access repository '{REPO_NAME}': {e}")
+# Step 4: Process the response
+if response.status_code == 200:
+    user = response.json()
+    print("✅ GitHub API Authentication Successful!")
+    print(f"👤 Username: {user['login']}")
+    print(f"📧 Email: {user.get('email', 'Not public')}")
+    print(f"🆔 User ID: {user['id']}")
+else:
+    print("❌ Authentication failed.")
+    print(f"Status Code: {response.status_code}")
+    print("Response:", response.json())
