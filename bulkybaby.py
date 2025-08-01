@@ -10,23 +10,25 @@ from git import Repo
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 CSV_FILE = "repos.csv"
 MANIFEST_FILENAME = "manifest.yaml"
-STACK_VALUE = "python"
+STACK_VALUE = "python"  # Desired value for application.stack
 # ------------------------------------------------
 
 if not GITHUB_TOKEN:
     raise Exception("GITHUB_TOKEN is not set")
 
+# Authenticate with GitHub
 g = Github(base_url="https://api.github.com", login_or_token=GITHUB_TOKEN)
 user = g.get_user()
 print(f"Authenticated as: {user.login}")
 
+# Read repository list from CSV
 df = pd.read_csv(CSV_FILE)
 
+# Loop through each repository
 for index, row in df.iterrows():
     repo_url = row['repo_url'].strip()
     base_branch = row['branch'].strip()
 
-    # Parse repo full name from URL
     if not repo_url.startswith("https://github.com/") or not repo_url.endswith(".git"):
         print(f"Skipping invalid repo URL: {repo_url}")
         continue
@@ -60,33 +62,40 @@ for index, row in df.iterrows():
             print("manifest.yaml not found. Skipping.")
             continue
 
-        # Modify or add stack field
+        # Read and update manifest.yaml
+        print(f"Editing: {manifest_path}")
         with open(manifest_path, 'r') as f:
             data = yaml.safe_load(f) or {}
 
-        if 'stack' in data:
-            print(f"Updating existing 'stack': {data['stack']} → {STACK_VALUE}")
-        else:
-            print("Adding new 'stack' key")
+        # Ensure 'application' section exists and is a dictionary
+        if 'application' not in data or not isinstance(data['application'], dict):
+            print("Creating 'application' section")
+            data['application'] = {}
 
-        data['stack'] = STACK_VALUE
+        # Modify or add 'stack' under 'application'
+        if 'stack' in data['application']:
+            print(f"Updating application.stack: {data['application']['stack']} → {STACK_VALUE}")
+        else:
+            print("Adding application.stack")
+
+        data['application']['stack'] = STACK_VALUE
 
         with open(manifest_path, 'w') as f:
-            yaml.dump(data, f, sort_keys=False)
+            yaml.dump(data, f, sort_keys=False, default_style='"')
 
         # Commit and push
         git.add(A=True)
         git.config('--global', 'user.name', 'Automation Bot')
         git.config('--global', 'user.email', 'bot@example.com')
-        repo_local.index.commit(f"Set 'stack' to '{STACK_VALUE}' in manifest.yaml")
+        repo_local.index.commit(f"Set application.stack to '{STACK_VALUE}' in manifest.yaml")
         git.push('--set-upstream', 'origin', new_branch)
         print(f"Pushed branch: {new_branch}")
 
-        # Create PR
+        # Create Pull Request
         repo_obj = g.get_repo(repo_full_name)
         pr = repo_obj.create_pull(
-            title=f"Update stack to {STACK_VALUE}",
-            body=f"Setting stack to `{STACK_VALUE}` via automation",
+            title=f"Update application.stack to {STACK_VALUE}",
+            body=f"Setting `application.stack: {STACK_VALUE}` via automation",
             head=new_branch,
             base=base_branch
         )
