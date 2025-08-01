@@ -1,30 +1,29 @@
 import os
 import shutil
-import yaml
 import pandas as pd
 from datetime import datetime
 from github import Github
 from git import Repo
+from ruamel.yaml import YAML
 
 # -------------------- CONFIG --------------------
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 CSV_FILE = "repos.csv"
 MANIFEST_FILENAME = "manifest.yaml"
-STACK_VALUE = "python"  # Desired value for application.stack
+STACK_VALUE = "cnfsblinuxs4"
 # ------------------------------------------------
 
 if not GITHUB_TOKEN:
     raise Exception("GITHUB_TOKEN is not set")
 
-# Authenticate with GitHub
 g = Github(base_url="https://api.github.com", login_or_token=GITHUB_TOKEN)
 user = g.get_user()
 print(f"Authenticated as: {user.login}")
 
-# Read repository list from CSV
 df = pd.read_csv(CSV_FILE)
+yaml = YAML()
+yaml.preserve_quotes = True
 
-# Loop through each repository
 for index, row in df.iterrows():
     repo_url = row['repo_url'].strip()
     base_branch = row['branch'].strip()
@@ -62,17 +61,15 @@ for index, row in df.iterrows():
             print("manifest.yaml not found. Skipping.")
             continue
 
-        # Read and update manifest.yaml
+        # Load and safely modify manifest.yaml
         print(f"Editing: {manifest_path}")
         with open(manifest_path, 'r') as f:
-            data = yaml.safe_load(f) or {}
+            data = yaml.load(f) or {}
 
-        # Ensure 'application' section exists and is a dictionary
         if 'application' not in data or not isinstance(data['application'], dict):
             print("Creating 'application' section")
             data['application'] = {}
 
-        # Modify or add 'stack' under 'application'
         if 'stack' in data['application']:
             print(f"Updating application.stack: {data['application']['stack']} → {STACK_VALUE}")
         else:
@@ -81,7 +78,7 @@ for index, row in df.iterrows():
         data['application']['stack'] = STACK_VALUE
 
         with open(manifest_path, 'w') as f:
-            yaml.dump(data, f, sort_keys=False, default_style='"')
+            yaml.dump(data, f)
 
         # Commit and push
         git.add(A=True)
